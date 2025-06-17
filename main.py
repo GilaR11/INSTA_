@@ -291,24 +291,43 @@ async def handle_proxy_file(message: Message, state: FSMContext):
             logger.info(f"Прокси ({len(proxy_lines)}) больше, чем аккаунтов ({len(account_lines)}). Будет проверено только {len(account_lines)} прокси.")
             proxy_lines = proxy_lines[:len(account_lines)]
 
-        # --- Проверка прокси ---
-        await message.answer(f"Начинаю проверку {len(proxy_lines)} прокси (по количеству аккаунтов)...")
-        working_proxies = []
+        # --- Проверка прокси в параллель ---
+        await message.answer(
+            f"Начинаю проверку {len(proxy_lines)} прокси (по количеству аккаунтов)..."
+        )
         total_proxies = len(proxy_lines)
-        logger.info(f"Начинаю проверку {total_proxies} прокси...")
-        for i, proxy in enumerate(proxy_lines):
-            status_line = f"Проверка ({i + 1}/{total_proxies}): {proxy[:40]}..."
-            print(status_line.ljust(80), end='\r', flush=True)
-            is_ok, result = await check_proxy(proxy)
+        logger.info(f"Начинаю проверку {total_proxies} прокси параллельно...")
+
+        timeout_seconds = 30
+        tasks = [
+            asyncio.wait_for(check_proxy(proxy), timeout_seconds)
+            for proxy in proxy_lines
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        working_proxies = []
+        for proxy, res in zip(proxy_lines, results):
+            if isinstance(res, Exception):
+                logger.warning(
+                    f"Прокси {proxy[:40]}... НЕ РАБОТАЕТ. Причина: {str(res)}"
+                )
+                continue
+
+            is_ok, result = res
             if is_ok:
                 working_proxies.append(result)
                 logger.info(f"Прокси {result[:40]}... OK")
             else:
-                logger.warning(f"Прокси {proxy[:40]}... НЕ РАБОТАЕТ. Причина: {result}")
+                logger.warning(
+                    f"Прокси {proxy[:40]}... НЕ РАБОТАЕТ. Причина: {result}"
+                )
 
-        print("".ljust(80), end="\r", flush=True) # Очищаем строку проверки
-        logger.info(f"Проверка прокси завершена. Работает: {len(working_proxies)}/{total_proxies}")
-        await message.answer(f"Проверка завершена. Работающих прокси: {len(working_proxies)}/{total_proxies}.")
+        logger.info(
+            f"Проверка прокси завершена. Работает: {len(working_proxies)}/{total_proxies}"
+        )
+        await message.answer(
+            f"Проверка завершена. Работающих прокси: {len(working_proxies)}/{total_proxies}."
+        )
         # --- Конец проверки ---
 
         if not working_proxies:
