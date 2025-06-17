@@ -1,0 +1,9 @@
+# Установка зависимостей для проекта
+
+pip install aiogram==3.20.0
+pip install instagrapi==2.1.5
+pip install aiosqlite==0.19.0
+pip install python-dotenv==1.0.1
+pip install twocaptcha==0.0.1
+pip install requests==2.31.0
+pip install Pillow==11.2.1
